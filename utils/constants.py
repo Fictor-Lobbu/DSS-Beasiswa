@@ -1,0 +1,1 @@
+KRITERIA = ["prestasi", "surat", "ipk"]
