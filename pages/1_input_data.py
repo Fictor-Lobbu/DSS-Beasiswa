@@ -16,10 +16,9 @@ st.markdown("<p style='opacity: 0.8; margin-top: -10px;'>Tambahkan data kandidat
 conn = connect_db()
 c = conn.cursor()
 
-# 🔍 1. Ambil kolom dari database secara otomatis
+# 🔍 Ambil kolom dari database
 cols_info = pd.read_sql_query("PRAGMA table_info(mahasiswa)", conn)
 
-# 2. Ambil semua kolom KECUALI kolom sistem
 kriteria_list = cols_info[
     ~cols_info['name'].isin(['id', 'nama', 'skor', 'ranking'])
 ]['name'].tolist()
@@ -32,13 +31,16 @@ nama = st.text_input("Nama Lengkap", placeholder="Masukkan nama mahasiswa...")
 col1, col2 = st.columns(2)
 input_values = {}
 
-# 🔄 Loop kriteria dinamis
+# 🔥 TAMBAHAN: simpan IPK asli untuk validasi
+ipk_asli = None
+
+# 🔄 Loop kriteria
 for i, k in enumerate(kriteria_list):
     label = k.replace("_", " ").title()
 
     with col1 if i % 2 == 0 else col2:
 
-        # 🔥 PERINGKAT (FIX UTAMA DI SINI)
+        # 🏆 PERINGKAT
         if k == 'peringkat':
             p_label = st.selectbox(
                 "Peringkat Juara Umum",
@@ -46,7 +48,6 @@ for i, k in enumerate(kriteria_list):
                 key="key_peringkat"
             )
 
-            # ✅ Nilai asli (natural)
             raw_map = {
                 "Juara 1": 1,
                 "Juara 2": 2,
@@ -55,9 +56,8 @@ for i, k in enumerate(kriteria_list):
 
             nilai_asli = raw_map[p_label]
 
-            # 🔥 Transformasi ke benefit (MOORA)
+            # Transformasi (benefit)
             nilai_transform = 4 - nilai_asli
-
             input_values[k] = nilai_transform
 
         # 📄 SURAT
@@ -77,9 +77,10 @@ for i, k in enumerate(kriteria_list):
                 key="key_ipk"
             )
 
-            input_values[k] = ipk_val
+            # 🔥 simpan IPK asli untuk validasi
+            ipk_asli = ipk_val
 
-            # 🔥 KETERANGAN SKALA IPK
+            # 🔥 TRANSFORMASI
             if 3.25 <= ipk_val <= 3.70:
                 skala = 1
             elif 3.71 <= ipk_val <= 3.90:
@@ -89,11 +90,16 @@ for i, k in enumerate(kriteria_list):
             else:
                 skala = None
 
-            # Tampilkan ke user
-            if skala:
-                st.info(f"📊 Skala IPK: {skala}")
+            if skala is None:
+                st.warning("IPK tidak valid (minimal 3.25)")
+            else:
+                # simpan hasil transformasi
+                input_values[k] = skala
 
-        # 🔄 KRITERIA TAMBAHAN (DINAMIS)
+                # tampilkan info
+                st.info(f"📊 Skala IPK: {skala} ({ipk_val})")
+
+        # 🔄 KRITERIA LAIN
         else:
             input_values[k] = st.number_input(
                 f"Nilai {label}",
@@ -111,7 +117,8 @@ if st.button("Simpan Data", type="primary", use_container_width=True):
     if not nama:
         st.warning("Nama wajib diisi!")
 
-    elif 'ipk' in input_values and not validasi_ipk(input_values['ipk']):
+    # 🔥 VALIDASI PAKAI IPK ASLI (FIX UTAMA)
+    elif ipk_asli is not None and not validasi_ipk(ipk_asli):
         st.error("Gagal: IPK minimal harus 3.25.")
 
     else:
